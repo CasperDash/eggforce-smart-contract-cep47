@@ -4,17 +4,27 @@
 #[macro_use]
 extern crate alloc;
 
-use alloc::{boxed::Box, collections::BTreeSet, format, string::String, vec::Vec};
+use alloc::{
+    boxed::Box,
+    collections::BTreeSet,
+    format,
+    string::{String, ToString},
+    vec::Vec,
+};
 use casper_contract::{
     contract_api::{runtime, storage},
     unwrap_or_revert::UnwrapOrRevert,
 };
 use casper_types::{
-    runtime_args, CLType, CLTyped, CLValue, ContractPackageHash, EntryPoint, EntryPointAccess,
-    EntryPointType, EntryPoints, Group, Key, Parameter, RuntimeArgs, URef, U256,
+    account::AccountHash, contracts::NamedKeys, runtime_args, CLType, CLTyped, CLValue,
+    ContractHash, ContractPackageHash, EntryPoint, EntryPointAccess, EntryPointType, EntryPoints,
+    Group, Key, Parameter, RuntimeArgs, URef, U256,
 };
 use cep47::{Meta, TokenId, CEP47};
 use contract_utils::{ContractContext, OnChainContractStorage};
+
+const WHITELIST_ACCOUNTS: &str = "whitelist_accounts";
+const WHITELIST_CONTRACTS: &str = "whitelist_contracts";
 
 #[derive(Default)]
 struct NFTToken(OnChainContractStorage);
@@ -27,8 +37,22 @@ impl ContractContext<OnChainContractStorage> for NFTToken {
 
 impl CEP47<OnChainContractStorage> for NFTToken {}
 impl NFTToken {
-    fn constructor(&mut self, name: String, symbol: String, meta: Meta) {
-        CEP47::init(self, name, symbol, meta);
+    fn constructor(
+        &mut self,
+        name: String,
+        symbol: String,
+        meta: Meta,
+        whitelist_accounts: Vec<AccountHash>,
+        whitelist_contracts: Vec<ContractHash>,
+    ) {
+        CEP47::init(
+            self,
+            name,
+            symbol,
+            meta,
+            whitelist_accounts,
+            whitelist_contracts,
+        );
     }
 }
 
@@ -37,7 +61,9 @@ fn constructor() {
     let name = runtime::get_named_arg::<String>("name");
     let symbol = runtime::get_named_arg::<String>("symbol");
     let meta = runtime::get_named_arg::<Meta>("meta");
-    NFTToken::default().constructor(name, symbol, meta);
+    let whitelist_accounts: Vec<AccountHash> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
+    let whitelist_contracts: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
+    NFTToken::default().constructor(name, symbol, meta, whitelist_accounts, whitelist_contracts);
 }
 
 #[no_mangle]
@@ -62,6 +88,18 @@ fn meta() {
 fn total_supply() {
     let ret = NFTToken::default().total_supply();
     runtime::ret(CLValue::from_t(ret).unwrap_or_revert());
+}
+
+#[no_mangle]
+fn set_whitelist_accounts() {
+    let value: Vec<AccountHash> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
+    NFTToken::default().set_whitelist_accounts(value);
+}
+
+#[no_mangle]
+fn set_whitelist_contracts() {
+    let value: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
+    NFTToken::default().set_whitelist_contracts(value);
 }
 
 #[no_mangle]
@@ -176,22 +214,36 @@ fn call() {
     let meta: Meta = runtime::get_named_arg("meta");
     let contract_name: String = runtime::get_named_arg("contract_name");
 
+    let whitelist_accounts: Vec<AccountHash> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
+    let whitelist_contracts: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
+
     // Prepare constructor args
     let constructor_args = runtime_args! {
         "name" => name,
         "symbol" => symbol,
-        "meta" => meta
+        "meta" => meta,
+        "whitelist_accounts" => whitelist_accounts,
+        "whitelist_contracts" => whitelist_contracts
     };
+
+    let named_keys = {
+        let mut named_keys = NamedKeys::new();
+        named_keys.insert("installer".to_string(), runtime::get_caller().into());
+
+        named_keys
+    };
+
+    let hash_key_name = format!("{}_contract_package_hash", contract_name);
 
     let (contract_hash, _) = storage::new_contract(
         get_entry_points(),
-        None,
-        Some(String::from("contract_package_hash")),
+        Some(named_keys),
+        Some(hash_key_name.clone()),
         None,
     );
 
     let package_hash: ContractPackageHash = ContractPackageHash::new(
-        runtime::get_key("contract_package_hash")
+        runtime::get_key(&hash_key_name)
             .unwrap_or_revert()
             .into_hash()
             .unwrap_or_revert(),
@@ -228,6 +280,14 @@ fn get_entry_points() -> EntryPoints {
             Parameter::new("name", String::cl_type()),
             Parameter::new("symbol", String::cl_type()),
             Parameter::new("meta", Meta::cl_type()),
+            Parameter::new(
+                WHITELIST_ACCOUNTS,
+                CLType::List(Box::new(CLType::ByteArray(32u32))),
+            ),
+            Parameter::new(
+                WHITELIST_CONTRACTS,
+                CLType::List(Box::new(CLType::ByteArray(32u32))),
+            ),
         ],
         <()>::cl_type(),
         EntryPointAccess::Groups(vec![Group::new("constructor")]),
@@ -373,6 +433,26 @@ fn get_entry_points() -> EntryPoints {
             Parameter::new("index", U256::cl_type()),
         ],
         CLType::Option(Box::new(TokenId::cl_type())),
+        EntryPointAccess::Public,
+        EntryPointType::Contract,
+    ));
+    entry_points.add_entry_point(EntryPoint::new(
+        "set_whitelist_accounts",
+        vec![Parameter::new(
+            WHITELIST_ACCOUNTS,
+            CLType::List(Box::new(CLType::ByteArray(32u32))),
+        )],
+        <()>::cl_type(),
+        EntryPointAccess::Public,
+        EntryPointType::Contract,
+    ));
+    entry_points.add_entry_point(EntryPoint::new(
+        "set_whitelist_contracts",
+        vec![Parameter::new(
+            WHITELIST_CONTRACTS,
+            CLType::List(Box::new(CLType::ByteArray(32u32))),
+        )],
+        <()>::cl_type(),
         EntryPointAccess::Public,
         EntryPointType::Contract,
     ));

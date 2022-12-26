@@ -5,6 +5,7 @@ extern crate alloc;
 mod cep47;
 pub mod data;
 pub mod event;
+pub mod utils;
 
 pub use cep47::{Error, CEP47};
 pub use contract_utils;

@@ -1,10 +1,11 @@
 use crate::{
     data::{self, Allowances, Metadata, OwnedTokens, Owners},
     event::CEP47Event,
-    Meta, TokenId,
+    utils, Meta, TokenId,
 };
 use alloc::{string::String, vec::Vec};
-use casper_types::{ApiError, Key, U256};
+use casper_contract::{contract_api::runtime, unwrap_or_revert::UnwrapOrRevert};
+use casper_types::{account::AccountHash, ApiError, ContractHash, Key, KeyTag, Tagged, U256};
 use contract_utils::{ContractContext, ContractStorage};
 use core::convert::TryInto;
 
@@ -14,6 +15,11 @@ pub enum Error {
     WrongArguments = 2,
     TokenIdAlreadyExists = 3,
     TokenIdDoesntExist = 4,
+    InvalidKey = 69,
+    UnlistedContractHash = 81,
+    MissingAdminRights = 204,
+    MissingMintRights = 205,
+    MissingMetadataRights = 206,
 }
 
 impl From<Error> for ApiError {
@@ -22,12 +28,31 @@ impl From<Error> for ApiError {
     }
 }
 
+#[repr(u8)]
+pub enum PermissionsMode {
+    /// Installer
+    Admins = 0,
+    // Installer, whitelisted accounts or contracts
+    Mint = 1,
+    /// Installer, whitelisted accounts, contracts or whitelisted metadata
+    Metadata = 2,
+}
+
 pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
-    fn init(&mut self, name: String, symbol: String, meta: Meta) {
+    fn init(
+        &mut self,
+        name: String,
+        symbol: String,
+        meta: Meta,
+        whitelist_accounts: Vec<AccountHash>,
+        whitelist_contracts: Vec<ContractHash>,
+    ) {
         data::set_name(name);
         data::set_symbol(symbol);
         data::set_meta(meta);
         data::set_total_supply(U256::zero());
+        data::set_whitelist_accounts(whitelist_accounts);
+        data::set_whitelist_contracts(whitelist_contracts);
         Owners::init();
         OwnedTokens::init();
         Metadata::init();
@@ -67,11 +92,31 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             return Err(Error::TokenIdDoesntExist);
         };
 
+        self.require_permissions(PermissionsMode::Metadata);
+
         let metadata_dict = Metadata::instance();
         metadata_dict.set(&token_id, meta);
 
         self.emit(CEP47Event::MetadataUpdate { token_id });
         Ok(())
+    }
+
+    fn get_whitelist_accounts(&self) -> Vec<AccountHash> {
+        data::get_whitelist_accounts()
+    }
+
+    fn set_whitelist_accounts(&mut self, value: Vec<AccountHash>) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_whitelist_accounts(value)
+    }
+
+    fn get_whitelist_contracts(&self) -> Vec<ContractHash> {
+        data::get_whitelist_contracts()
+    }
+
+    fn set_whitelist_contracts(&mut self, value: Vec<ContractHash>) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_whitelist_contracts(value)
     }
 
     fn get_token_by_index(&self, owner: Key, index: U256) -> Option<TokenId> {
@@ -93,6 +138,8 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         token_ids: Vec<TokenId>,
         token_metas: Vec<Meta>,
     ) -> Result<Vec<TokenId>, Error> {
+        self.require_permissions(PermissionsMode::Mint);
+
         if token_ids.len() != token_metas.len() {
             return Err(Error::WrongArguments);
         };
@@ -278,5 +325,47 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
 
     fn emit(&mut self, event: CEP47Event) {
         data::emit(&event);
+    }
+
+    fn require_permissions(&mut self, mode: PermissionsMode) {
+        let caller = utils::get_verified_caller();
+        match caller.tag() {
+            KeyTag::Hash => {
+                let calling_contract = caller
+                    .into_hash()
+                    .map(ContractHash::new)
+                    .unwrap_or_default();
+                let whitelist_contracts = self.get_whitelist_contracts();
+                if !whitelist_contracts.is_empty() && !whitelist_contracts.contains(&calling_contract) {
+                    runtime::revert(Error::UnlistedContractHash)
+                }
+            }
+            KeyTag::Account => {
+                let installer = runtime::get_key("installer")
+                    .unwrap_or_revert()
+                    .into_account()
+                    .unwrap_or_revert();
+
+                let caller_account = runtime::get_caller();
+                if installer != caller_account {
+                    if let PermissionsMode::Admins = mode {
+                        runtime::revert(Error::MissingAdminRights)
+                    } else if let PermissionsMode::Mint = mode {
+                        let whitelist_accounts = self.get_whitelist_accounts();
+                        if !whitelist_accounts.is_empty() && !whitelist_accounts.contains(&caller_account) {
+                            runtime::revert(Error::MissingMintRights)
+                        }
+                    } else if let PermissionsMode::Metadata = mode {
+                        let whitelist_accounts = self.get_whitelist_accounts();
+                        if !whitelist_accounts.is_empty() && !whitelist_accounts.contains(&caller_account) {
+                            runtime::revert(Error::MissingMetadataRights)
+                        }
+                    } else {
+                        runtime::revert(Error::InvalidKey)
+                    }
+                }
+            }
+            _ => runtime::revert(Error::InvalidKey),
+        }
     }
 }

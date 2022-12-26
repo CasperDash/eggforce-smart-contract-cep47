@@ -5,7 +5,7 @@ use blake2::{
     VarBlake2b,
 };
 use casper_types::{
-    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, Key, RuntimeArgs, U256,
+    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, Key, RuntimeArgs, U256, ContractHash,
 };
 use test_env::{TestContract, TestEnv};
 
@@ -23,6 +23,9 @@ impl CEP47Instance {
         symbol: &str,
         meta: Meta,
     ) -> CEP47Instance {
+        let accounts: Vec<AccountHash> = Vec::new(); 
+        let contracts: Vec<ContractHash> = Vec::new(); 
+
         CEP47Instance(TestContract::new(
             env,
             "cep47-token.wasm",
@@ -31,19 +34,27 @@ impl CEP47Instance {
             runtime_args! {
                 "name" => name,
                 "symbol" => symbol,
-                "meta" => meta
+                "meta" => meta,
+                "whitelist_accounts" => accounts,
+                "whitelist_contracts" => contracts
             },
         ))
     }
 
     pub fn constructor(&self, sender: AccountHash, name: &str, symbol: &str, meta: Meta) {
+        let accounts: Vec<AccountHash> = Vec::new(); 
+        let contracts: Vec<ContractHash> = Vec::new(); 
+
         self.0.call_contract(
             sender,
             "constructor",
             runtime_args! {
-            "name" => name,
-            "symbol" => symbol,
-            "meta" => meta},
+                "name" => name,
+                "symbol" => symbol,
+                "meta" => meta,
+                "whitelist_accounts" => accounts,
+                "whitelist_contracts" => contracts
+            },
         );
     }
 
