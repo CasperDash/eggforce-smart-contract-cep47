@@ -5,7 +5,8 @@ use blake2::{
     VarBlake2b,
 };
 use casper_types::{
-    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, Key, RuntimeArgs, U256, ContractHash,
+    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, ContractHash, Key,
+    RuntimeArgs, U256,
 };
 use test_env::{TestContract, TestEnv};
 
@@ -23,8 +24,8 @@ impl CEP47Instance {
         symbol: &str,
         meta: Meta,
     ) -> CEP47Instance {
-        let accounts: Vec<AccountHash> = Vec::new(); 
-        let contracts: Vec<ContractHash> = Vec::new(); 
+        let accounts = Option::<Vec<AccountHash>>::None;
+        let contracts = Option::<Vec<ContractHash>>::None;
 
         CEP47Instance(TestContract::new(
             env,
@@ -42,8 +43,8 @@ impl CEP47Instance {
     }
 
     pub fn constructor(&self, sender: AccountHash, name: &str, symbol: &str, meta: Meta) {
-        let accounts: Vec<AccountHash> = Vec::new(); 
-        let contracts: Vec<ContractHash> = Vec::new(); 
+        let accounts = Option::<Vec<AccountHash>>::None;
+        let contracts = Option::<Vec<ContractHash>>::None;
 
         self.0.call_contract(
             sender,
@@ -58,19 +59,12 @@ impl CEP47Instance {
         );
     }
 
-    pub fn mint_one<T: Into<Key>>(
-        &self,
-        sender: AccountHash,
-        recipient: T,
-        token_id: TokenId,
-        token_meta: Meta,
-    ) {
+    pub fn mint_one<T: Into<Key>>(&self, sender: AccountHash, recipient: T, token_meta: Meta) {
         self.0.call_contract(
             sender,
             "mint",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => vec![token_id],
                 "token_metas" => vec![token_meta]
             },
         )
@@ -80,7 +74,6 @@ impl CEP47Instance {
         &self,
         sender: AccountHash,
         recipient: T,
-        token_ids: Vec<TokenId>,
         token_meta: Meta,
         count: u32,
     ) {
@@ -89,7 +82,6 @@ impl CEP47Instance {
             "mint_copies",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => token_ids,
                 "token_meta" => token_meta,
                 "count" => count
             },
@@ -100,7 +92,6 @@ impl CEP47Instance {
         &self,
         sender: AccountHash,
         recipient: T,
-        token_ids: Vec<TokenId>,
         token_metas: Vec<Meta>,
     ) {
         self.0.call_contract(
@@ -108,7 +99,6 @@ impl CEP47Instance {
             "mint",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => token_ids,
                 "token_metas" => token_metas
             },
         )

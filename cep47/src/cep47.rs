@@ -123,48 +123,27 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         OwnedTokens::instance().get_token_by_index(&owner, &index)
     }
 
-    fn validate_token_ids(&self, token_ids: Vec<TokenId>) -> bool {
-        for token_id in &token_ids {
-            if self.owner_of(*token_id).is_some() {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn mint(
-        &mut self,
-        recipient: Key,
-        token_ids: Vec<TokenId>,
-        token_metas: Vec<Meta>,
-    ) -> Result<Vec<TokenId>, Error> {
+    fn mint(&mut self, recipient: Key, token_metas: Vec<Meta>) -> Result<Vec<TokenId>, Error> {
         self.require_permissions(PermissionsMode::Mint);
-
-        if token_ids.len() != token_metas.len() {
-            return Err(Error::WrongArguments);
-        };
-
-        for token_id in &token_ids {
-            if self.owner_of(*token_id).is_some() {
-                return Err(Error::TokenIdAlreadyExists);
-            }
-        }
 
         let owners_dict = Owners::instance();
         let owned_tokens_dict = OwnedTokens::instance();
         let metadata_dict = Metadata::instance();
 
-        for (token_id, token_meta) in token_ids.iter().zip(&token_metas) {
-            metadata_dict.set(token_id, token_meta.clone());
-            owners_dict.set(token_id, recipient);
-            owned_tokens_dict.set_token(&recipient, token_id);
+        let mut token_id = data::total_supply();
+        let mut token_ids = vec![];
+
+        for token_meta in token_metas {
+            token_ids.push(token_id);
+
+            metadata_dict.set(&token_id, token_meta.clone());
+            owners_dict.set(&token_id, recipient);
+            owned_tokens_dict.set_token(&recipient, &token_id);
+
+            token_id = token_id.checked_add(U256::one()).unwrap_or_revert();
         }
 
-        let minted_tokens_count: U256 = From::<u64>::from(token_ids.len().try_into().unwrap());
-        let new_total_supply = data::total_supply()
-            .checked_add(minted_tokens_count)
-            .unwrap();
-        data::set_total_supply(new_total_supply);
+        data::set_total_supply(token_id);
 
         self.emit(CEP47Event::Mint {
             recipient,
@@ -176,12 +155,11 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
     fn mint_copies(
         &mut self,
         recipient: Key,
-        token_ids: Vec<TokenId>,
         token_meta: Meta,
         count: u32,
     ) -> Result<Vec<TokenId>, Error> {
         let token_metas = vec![token_meta; count.try_into().unwrap()];
-        self.mint(recipient, token_ids, token_metas)
+        self.mint(recipient, token_metas)
     }
 
     fn burn(&mut self, owner: Key, token_ids: Vec<TokenId>) -> Result<(), Error> {
@@ -336,7 +314,9 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
                     .map(ContractHash::new)
                     .unwrap_or_default();
                 let whitelist_contracts = self.get_whitelist_contracts();
-                if !whitelist_contracts.is_empty() && !whitelist_contracts.contains(&calling_contract) {
+                if !whitelist_contracts.is_empty()
+                    && !whitelist_contracts.contains(&calling_contract)
+                {
                     runtime::revert(Error::UnlistedContractHash)
                 }
             }
@@ -350,18 +330,19 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
                 if installer != caller_account {
                     if let PermissionsMode::Admins = mode {
                         runtime::revert(Error::MissingAdminRights)
-                    } else if let PermissionsMode::Mint = mode {
-                        let whitelist_accounts = self.get_whitelist_accounts();
-                        if !whitelist_accounts.is_empty() && !whitelist_accounts.contains(&caller_account) {
-                            runtime::revert(Error::MissingMintRights)
-                        }
-                    } else if let PermissionsMode::Metadata = mode {
-                        let whitelist_accounts = self.get_whitelist_accounts();
-                        if !whitelist_accounts.is_empty() && !whitelist_accounts.contains(&caller_account) {
-                            runtime::revert(Error::MissingMetadataRights)
-                        }
                     } else {
-                        runtime::revert(Error::InvalidKey)
+                        let whitelist_accounts = self.get_whitelist_accounts();
+                        let whitelist_count = whitelist_accounts.len();
+
+                        let valid =
+                            whitelist_count == 0 || whitelist_accounts.contains(&caller_account);
+                        if !valid {
+                            if let PermissionsMode::Mint = mode {
+                                runtime::revert(Error::MissingMintRights);
+                            } else {
+                                runtime::revert(Error::MissingMetadataRights);
+                            }
+                        }
                     }
                 }
             }
