@@ -51,6 +51,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         data::set_symbol(symbol);
         data::set_meta(meta);
         data::set_total_supply(U256::zero());
+        data::set_token_id_counter(U256::zero());
         data::set_whitelist_accounts(whitelist_accounts);
         data::set_whitelist_contracts(whitelist_contracts);
         Owners::init();
@@ -73,6 +74,10 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
 
     fn total_supply(&self) -> U256 {
         data::total_supply()
+    }
+
+    fn token_id_counter(&self) -> U256 {
+        data::token_id_counter()
     }
 
     fn balance_of(&self, owner: Key) -> U256 {
@@ -130,7 +135,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         let owned_tokens_dict = OwnedTokens::instance();
         let metadata_dict = Metadata::instance();
 
-        let mut token_id = data::total_supply();
+        let mut token_id = data::token_id_counter();
         let mut token_ids = vec![];
 
         for token_meta in token_metas {
@@ -143,7 +148,13 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             token_id = token_id.checked_add(U256::one()).unwrap_or_revert();
         }
 
-        data::set_total_supply(token_id);
+        data::set_token_id_counter(token_id);
+
+        let minted_tokens_count: U256 = From::<u64>::from(token_ids.len().try_into().unwrap());
+        let new_total_supply = data::total_supply()
+            .checked_add(minted_tokens_count)
+            .unwrap();
+        data::set_total_supply(new_total_supply);
 
         self.emit(CEP47Event::Mint {
             recipient,

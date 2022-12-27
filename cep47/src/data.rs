@@ -27,6 +27,7 @@ pub const NAME: &str = "name";
 pub const META: &str = "meta";
 pub const SYMBOL: &str = "symbol";
 pub const TOTAL_SUPPLY: &str = "total_supply";
+pub const TOKEN_ID_COUNTER: &str = "token_id_counter";
 pub const WHITELIST_ACCOUNTS: &str = "whitelist_accounts";
 pub const WHITELIST_CONTRACTS: &str = "whitelist_contracts";
 
@@ -231,6 +232,14 @@ pub fn total_supply() -> U256 {
 
 pub fn set_total_supply(total_supply: U256) {
     set_key(TOTAL_SUPPLY, total_supply);
+}
+
+pub fn token_id_counter() -> U256 {
+    get_key(TOKEN_ID_COUNTER).unwrap_or_default()
+}
+
+pub fn set_token_id_counter(value: U256) {
+    set_key(TOKEN_ID_COUNTER, value);
 }
 
 pub fn get_whitelist_accounts() -> Vec<AccountHash> {

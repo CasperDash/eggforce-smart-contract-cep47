@@ -212,16 +212,18 @@ fn call() {
     let meta: Meta = runtime::get_named_arg("meta");
     let contract_name: String = runtime::get_named_arg("contract_name");
 
-    let whitelist_accounts_options: Option<Vec<AccountHash>> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
-    let whitelist_contracts_options: Option<Vec<ContractHash>> = runtime::get_named_arg(WHITELIST_CONTRACTS);
+    let whitelist_accounts_options: Option<Vec<AccountHash>> =
+        runtime::get_named_arg(WHITELIST_ACCOUNTS);
+    let whitelist_contracts_options: Option<Vec<ContractHash>> =
+        runtime::get_named_arg(WHITELIST_CONTRACTS);
 
     let whitelist_accounts = match whitelist_accounts_options {
         Some(value) => value,
-        None => Vec::new()
+        None => Vec::new(),
     };
     let whitelist_contracts = match whitelist_contracts_options {
         Some(value) => value,
-        None => Vec::new()
+        None => Vec::new(),
     };
 
     // Prepare constructor args
