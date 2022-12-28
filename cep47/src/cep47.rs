@@ -325,8 +325,9 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
                     .map(ContractHash::new)
                     .unwrap_or_default();
                 let whitelist_contracts = self.get_whitelist_contracts();
-                if !whitelist_contracts.is_empty()
-                    && !whitelist_contracts.contains(&calling_contract)
+                // We should allow only specific contracts to mint
+                if whitelist_contracts.is_empty()
+                    || !whitelist_contracts.contains(&calling_contract)
                 {
                     runtime::revert(Error::UnlistedContractHash)
                 }
@@ -343,10 +344,11 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
                         runtime::revert(Error::MissingAdminRights)
                     } else {
                         let whitelist_accounts = self.get_whitelist_accounts();
-                        let whitelist_count = whitelist_accounts.len();
 
-                        let valid =
-                            whitelist_count == 0 || whitelist_accounts.contains(&caller_account);
+                        // If no whitelist accounts, we allow everyone to mint
+                        // Otherwise, only whitelisted accounts can perform actions
+                        let valid = whitelist_accounts.is_empty()
+                            || whitelist_accounts.contains(&caller_account);
                         if !valid {
                             if let PermissionsMode::Mint = mode {
                                 runtime::revert(Error::MissingMintRights);
