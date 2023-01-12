@@ -126,6 +126,28 @@ impl CEP47Instance {
         )
     }
 
+    pub fn merge(&self, sender: AccountHash, token_ids: Vec<TokenId>, check_prop: &str) {
+        self.0.call_contract(
+            sender,
+            "merge",
+            runtime_args! {
+                "token_ids" => token_ids,
+                "check_prop" => check_prop
+            },
+        )
+    }
+
+    pub fn merge_fail(&self, sender: AccountHash, token_ids: Vec<TokenId>, check_prop: &str) {
+        self.0.call_contract_fail(
+            sender,
+            "merge",
+            runtime_args! {
+                "token_ids" => token_ids,
+                "check_prop" => check_prop
+            },
+        )
+    }
+
     pub fn transfer<T: Into<Key>>(
         &self,
         sender: AccountHash,

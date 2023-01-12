@@ -205,6 +205,15 @@ fn get_approved() {
 }
 
 #[no_mangle]
+fn merge() {
+    let token_ids = runtime::get_named_arg::<Vec<TokenId>>("token_ids");
+    let check_prop = runtime::get_named_arg::<String>("check_prop");
+    NFTToken::default()
+        .merge(token_ids, &check_prop)
+        .unwrap_or_revert();
+}
+
+#[no_mangle]
 fn call() {
     // Read arguments for the constructor call.
     let name: String = runtime::get_named_arg("name");
@@ -440,6 +449,16 @@ fn get_entry_points() -> EntryPoints {
             Parameter::new("index", U256::cl_type()),
         ],
         CLType::Option(Box::new(TokenId::cl_type())),
+        EntryPointAccess::Public,
+        EntryPointType::Contract,
+    ));
+    entry_points.add_entry_point(EntryPoint::new(
+        "merge",
+        vec![
+            Parameter::new("token_ids", CLType::List(Box::new(TokenId::cl_type()))),
+            Parameter::new("check_prop", String::cl_type()),
+        ],
+        <()>::cl_type(),
         EntryPointAccess::Public,
         EntryPointType::Contract,
     ));

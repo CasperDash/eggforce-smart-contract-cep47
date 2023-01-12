@@ -20,6 +20,11 @@ pub enum Error {
     MissingAdminRights = 204,
     MissingMintRights = 205,
     MissingMetadataRights = 206,
+    InvalidLength = 207,
+    MissingCheckingProperty = 208,
+    MissingMetadata = 209,
+    MissingMetadataValue = 210,
+    DifferentMetadata = 211,
 }
 
 impl From<Error> for ApiError {
@@ -310,6 +315,62 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             }
         }
         false
+    }
+
+    fn merge(&mut self, mut token_ids: Vec<TokenId>, check_prop: &str) -> Result<(), Error> {
+        if token_ids.len() < 2 {
+            return Err(Error::InvalidLength);
+        }
+        if check_prop.is_empty() {
+            return Err(Error::MissingCheckingProperty);
+        }
+
+        let owner = self.get_caller();
+        let metadata_dict = Metadata::instance();
+
+        // Keep the last token in list
+        let last_id = *token_ids.last().unwrap_or_revert();
+        // Confirm owner
+        match self.owner_of(last_id) {
+            Some(owner_of_key) => {
+                if owner_of_key != owner {
+                    return Err(Error::PermissionDenied);
+                }
+            }
+            None => {
+                return Err(Error::TokenIdDoesntExist);
+            }
+        }
+
+        let last_metadata = metadata_dict
+            .get(&last_id)
+            .unwrap_or_revert_with(Error::MissingMetadata);
+        let last_prop = last_metadata
+            .get(check_prop)
+            .unwrap_or_revert_with(Error::MissingMetadataValue);
+        if last_prop.is_empty() {
+            return Err(Error::MissingMetadataValue);
+        }
+
+        // Remove the last item
+        token_ids.truncate(token_ids.len() - 1);
+
+        // Verify that they have the same type
+        for other_id in &token_ids {
+            let other_metadata = metadata_dict
+                .get(other_id)
+                .unwrap_or_revert_with(Error::MissingMetadata);
+            let other_prop = other_metadata
+                .get(check_prop)
+                .unwrap_or_revert_with(Error::MissingMetadataValue);
+
+            if other_prop != last_prop {
+                return Err(Error::DifferentMetadata);
+            }
+        }
+
+        // Let's burn others
+        self.burn_internal(owner, token_ids)
     }
 
     fn emit(&mut self, event: CEP47Event) {

@@ -13,10 +13,17 @@ mod meta {
     pub fn contract_meta() -> Meta {
         let mut meta = BTreeMap::new();
         meta.insert("origin".to_string(), "fire".to_string());
+        meta.insert("color".to_string(), "yellow".to_string());
         meta
     }
 
     pub fn red_dragon() -> Meta {
+        let mut meta = BTreeMap::new();
+        meta.insert("color".to_string(), "red".to_string());
+        meta
+    }
+
+    pub fn red_dragon2() -> Meta {
         let mut meta = BTreeMap::new();
         meta.insert("color".to_string(), "red".to_string());
         meta
@@ -385,4 +392,62 @@ fn test_token_metadata_update() {
 
     token.update_token_meta(owner, token_id, meta::gold_dragon());
     assert_eq!(token.token_meta(token_id).unwrap(), meta::gold_dragon());
+}
+
+#[test]
+fn test_merge() {
+    let (env, token, owner) = deploy();
+    let user = env.next_user();
+    let token_metas = vec![
+        meta::red_dragon(),
+        meta::red_dragon2(),
+        meta::black_dragon(),
+    ];
+
+    token.mint_many(owner, user, token_metas);
+
+    token.merge(user, vec![U256::from(0), U256::from(1)], "color");
+
+    assert_eq!(token.total_supply(), U256::from(2));
+    assert_eq!(token.balance_of(Key::Account(user)), U256::from(2));
+
+    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(0)), Some(U256::from(2)));
+    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(1)), Some(U256::from(1)));
+    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(2)), None);
+}
+
+#[test]
+fn test_merge_missing_check_prop() {
+    let (env, token, owner) = deploy();
+    let user = env.next_user();
+    let token_metas = vec![
+        meta::red_dragon(),
+        meta::red_dragon2(),
+        meta::black_dragon(),
+    ];
+
+    token.mint_many(owner, user, token_metas);
+
+    token.merge_fail(user, vec![U256::from(0), U256::from(1)], "");
+
+    assert_eq!(token.total_supply(), U256::from(3));
+    assert_eq!(token.balance_of(Key::Account(user)), U256::from(3));
+}
+
+#[test]
+fn test_merge_different_type() {
+    let (env, token, owner) = deploy();
+    let user = env.next_user();
+    let token_metas = vec![
+        meta::red_dragon(),
+        meta::red_dragon2(),
+        meta::black_dragon(),
+    ];
+
+    token.mint_many(owner, user, token_metas);
+
+    token.merge_fail(user, vec![U256::from(0), U256::from(2)], "color");
+
+    assert_eq!(token.total_supply(), U256::from(3));
+    assert_eq!(token.balance_of(Key::Account(user)), U256::from(3));
 }
