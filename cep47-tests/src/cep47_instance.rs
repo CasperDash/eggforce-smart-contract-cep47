@@ -23,7 +23,7 @@ impl CEP47Instance {
         name: &str,
         symbol: &str,
         meta: Meta,
-        merge_prop: &str
+        merge_prop: &str,
     ) -> CEP47Instance {
         let accounts = Option::<Vec<AccountHash>>::None;
         let contracts = Option::<Vec<ContractHash>>::None;

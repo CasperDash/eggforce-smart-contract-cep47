@@ -44,7 +44,7 @@ impl NFTToken {
         meta: Meta,
         whitelist_accounts: Vec<AccountHash>,
         whitelist_contracts: Vec<ContractHash>,
-        merge_prop: String
+        merge_prop: String,
     ) {
         CEP47::init(
             self,
@@ -53,7 +53,7 @@ impl NFTToken {
             meta,
             whitelist_accounts,
             whitelist_contracts,
-            merge_prop
+            merge_prop,
         );
     }
 }
@@ -66,7 +66,14 @@ fn constructor() {
     let whitelist_accounts: Vec<AccountHash> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
     let whitelist_contracts: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
     let merge_prop = runtime::get_named_arg::<String>("merge_prop");
-    NFTToken::default().constructor(name, symbol, meta, whitelist_accounts, whitelist_contracts, merge_prop);
+    NFTToken::default().constructor(
+        name,
+        symbol,
+        meta,
+        whitelist_accounts,
+        whitelist_contracts,
+        merge_prop,
+    );
 }
 
 #[no_mangle]
@@ -216,9 +223,7 @@ fn get_approved() {
 #[no_mangle]
 fn merge() {
     let token_ids = runtime::get_named_arg::<Vec<TokenId>>("token_ids");
-    NFTToken::default()
-        .merge(token_ids)
-        .unwrap_or_revert();
+    NFTToken::default().merge(token_ids).unwrap_or_revert();
 }
 
 #[no_mangle]
@@ -316,7 +321,7 @@ fn get_entry_points() -> EntryPoints {
                 WHITELIST_CONTRACTS,
                 CLType::List(Box::new(CLType::ByteArray(32u32))),
             ),
-            Parameter::new("merge_prop", String::cl_type())
+            Parameter::new("merge_prop", String::cl_type()),
         ],
         <()>::cl_type(),
         EntryPointAccess::Groups(vec![Group::new("constructor")]),
@@ -465,9 +470,10 @@ fn get_entry_points() -> EntryPoints {
     ));
     entry_points.add_entry_point(EntryPoint::new(
         "merge",
-        vec![
-            Parameter::new("token_ids", CLType::List(Box::new(TokenId::cl_type())))
-        ],
+        vec![Parameter::new(
+            "token_ids",
+            CLType::List(Box::new(TokenId::cl_type())),
+        )],
         <()>::cl_type(),
         EntryPointAccess::Public,
         EntryPointType::Contract,

@@ -21,10 +21,9 @@ pub enum Error {
     MissingMintRights = 205,
     MissingMetadataRights = 206,
     InvalidLength = 207,
-    MissingCheckingProperty = 208,
-    MissingMetadata = 209,
-    MissingMetadataValue = 210,
-    DifferentMetadata = 211,
+    MissingMetadata = 208,
+    MissingMetadataValue = 209,
+    DifferentMetadata = 210,
 }
 
 impl From<Error> for ApiError {
@@ -51,7 +50,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         meta: Meta,
         whitelist_accounts: Vec<AccountHash>,
         whitelist_contracts: Vec<ContractHash>,
-        merge_prop: String
+        merge_prop: String,
     ) {
         data::set_name(name);
         data::set_symbol(symbol);
@@ -333,10 +332,8 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             return Err(Error::InvalidLength);
         }
 
-        let merge_prop = self.get_merge_prop().as_str();
-        if merge_prop.is_empty() {
-            return Err(Error::MissingCheckingProperty);
-        }
+        let merge_prop = self.get_merge_prop();
+        let has_merge_prop = !merge_prop.is_empty();
 
         let owner = self.get_caller();
         let metadata_dict = Metadata::instance();
@@ -355,30 +352,32 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             }
         }
 
-        let last_metadata = metadata_dict
-            .get(&last_id)
-            .unwrap_or_revert_with(Error::MissingMetadata);
-        let last_prop = last_metadata
-            .get(merge_prop)
-            .unwrap_or_revert_with(Error::MissingMetadataValue);
-        if last_prop.is_empty() {
-            return Err(Error::MissingMetadataValue);
-        }
-
         // Remove the last item
         token_ids.truncate(token_ids.len() - 1);
 
-        // Verify that they have the same type
-        for other_id in &token_ids {
-            let other_metadata = metadata_dict
-                .get(other_id)
+        if has_merge_prop {
+            let last_metadata = metadata_dict
+                .get(&last_id)
                 .unwrap_or_revert_with(Error::MissingMetadata);
-            let other_prop = other_metadata
-                .get(merge_prop)
+            let last_prop = last_metadata
+                .get(&merge_prop)
                 .unwrap_or_revert_with(Error::MissingMetadataValue);
+            if last_prop.is_empty() {
+                return Err(Error::MissingMetadataValue);
+            }
 
-            if other_prop != last_prop {
-                return Err(Error::DifferentMetadata);
+            // Verify that they have the same type
+            for other_id in &token_ids {
+                let other_metadata = metadata_dict
+                    .get(other_id)
+                    .unwrap_or_revert_with(Error::MissingMetadata);
+                let other_prop = other_metadata
+                    .get(&merge_prop)
+                    .unwrap_or_revert_with(Error::MissingMetadataValue);
+
+                if other_prop != last_prop {
+                    return Err(Error::DifferentMetadata);
+                }
             }
         }
 

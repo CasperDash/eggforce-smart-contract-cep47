@@ -60,7 +60,12 @@ impl TestContract {
         self.env.run(sender, session_code, session_args);
     }
 
-    pub fn call_contract_fail(&self, sender: AccountHash, entry_point: &str, session_args: RuntimeArgs) {
+    pub fn call_contract_fail(
+        &self,
+        sender: AccountHash,
+        entry_point: &str,
+        session_args: RuntimeArgs,
+    ) {
         let session_code = DeploySource::ByHash {
             hash: ContractHash::new(self.contract_hash()),
             method: entry_point.to_string(),

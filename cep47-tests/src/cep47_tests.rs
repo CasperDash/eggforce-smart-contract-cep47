@@ -58,7 +58,15 @@ fn deploy() -> (TestEnv, CEP47Instance, AccountHash) {
 fn deploy_with_merge(merge_prop: &str) -> (TestEnv, CEP47Instance, AccountHash) {
     let env = TestEnv::new();
     let owner = env.next_user();
-    let token = CEP47Instance::new(&env, NAME, owner, NAME, SYMBOL, meta::contract_meta(), merge_prop);
+    let token = CEP47Instance::new(
+        &env,
+        NAME,
+        owner,
+        NAME,
+        SYMBOL,
+        meta::contract_meta(),
+        merge_prop,
+    );
     (env, token, owner)
 }
 
@@ -418,9 +426,18 @@ fn test_merge() {
     assert_eq!(token.total_supply(), U256::from(2));
     assert_eq!(token.balance_of(Key::Account(user)), U256::from(2));
 
-    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(0)), Some(U256::from(2)));
-    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(1)), Some(U256::from(1)));
-    assert_eq!(token.get_token_by_index(Key::Account(user), U256::from(2)), None);
+    assert_eq!(
+        token.get_token_by_index(Key::Account(user), U256::from(0)),
+        Some(U256::from(2))
+    );
+    assert_eq!(
+        token.get_token_by_index(Key::Account(user), U256::from(1)),
+        Some(U256::from(1))
+    );
+    assert_eq!(
+        token.get_token_by_index(Key::Account(user), U256::from(2)),
+        None
+    );
 }
 
 #[test]
@@ -442,8 +459,8 @@ fn test_merge_different_type() {
 }
 
 #[test]
-fn test_merge_missing_free_merge() {
-    let (env, token, owner) = deploy_with_merge("color");
+fn test_merge_no_prop_free_merge() {
+    let (env, token, owner) = deploy_with_merge("");
     let user = env.next_user();
     let token_metas = vec![
         meta::red_dragon(),

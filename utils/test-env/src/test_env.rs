@@ -30,7 +30,12 @@ impl TestEnv {
         )
     }
 
-    pub fn run_fail(&self, sender: AccountHash, session_code: DeploySource, session_args: RuntimeArgs) {
+    pub fn run_fail(
+        &self,
+        sender: AccountHash,
+        session_code: DeploySource,
+        session_args: RuntimeArgs,
+    ) {
         deploy(
             &mut self.state.lock().unwrap().builder,
             &sender,
