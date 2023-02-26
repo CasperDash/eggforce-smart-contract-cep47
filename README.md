@@ -17,17 +17,16 @@ Visit the [Contract Interaction and Events Tutorial](/Contract-Interaction-Tutor
 When install a new CEP47
 
 ```
-name
-symbol
-meta
-whitelist_accounts Empty to allow all accounts, set to allow specific accounts which are able to call mint / update metadata
-whitelist_contracts: Empty to reject all contracts, set to allow specific contracts which are able to call mint / update metadata
+- name
+- symbol
+- meta
+- merge_prop: Property to verify 2 tokens which are able to merge, they must have the same value (e.g Class: Rock) and the caller must be also the owner of tokens. Empty to free-merge.
+- whitelist_accounts Empty to allow all accounts, set to allow specific accounts which are able to call mint / update metadata
+- whitelist_contracts: Empty to reject all contracts, set to allow specific contracts which are able to call mint / update metadata
 ```
  
 ## Merge
- 
 - token_ids: List ofif id of token to merge, the LAST one will be kept
-- check_prop: Property to verify 2 tokens which are able to merge, they must have the same value (e.g Class: Rock) and the caller must be also the owner of tokens.
  
 # Errors
 

@@ -28,6 +28,7 @@ pub const META: &str = "meta";
 pub const SYMBOL: &str = "symbol";
 pub const TOTAL_SUPPLY: &str = "total_supply";
 pub const TOKEN_ID_COUNTER: &str = "token_id_counter";
+pub const MERGE_PROP: &str = "merge_prop";
 pub const WHITELIST_ACCOUNTS: &str = "whitelist_accounts";
 pub const WHITELIST_CONTRACTS: &str = "whitelist_contracts";
 
@@ -256,6 +257,14 @@ pub fn get_whitelist_contracts() -> Vec<ContractHash> {
 
 pub fn set_whitelist_contracts(value: Vec<ContractHash>) {
     set_key(WHITELIST_CONTRACTS, value);
+}
+
+pub fn get_merge_prop() -> String {
+    get_key(MERGE_PROP).unwrap_or_default()
+}
+
+pub fn set_merge_prop(value: String) {
+    set_key(MERGE_PROP, value);
 }
 
 pub fn contract_package_hash() -> ContractPackageHash {

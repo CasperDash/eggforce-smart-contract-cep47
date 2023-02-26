@@ -51,6 +51,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         meta: Meta,
         whitelist_accounts: Vec<AccountHash>,
         whitelist_contracts: Vec<ContractHash>,
+        merge_prop: String
     ) {
         data::set_name(name);
         data::set_symbol(symbol);
@@ -59,6 +60,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         data::set_token_id_counter(U256::zero());
         data::set_whitelist_accounts(whitelist_accounts);
         data::set_whitelist_contracts(whitelist_contracts);
+        data::set_merge_prop(merge_prop);
         Owners::init();
         OwnedTokens::init();
         Metadata::init();
@@ -127,6 +129,15 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
     fn set_whitelist_contracts(&mut self, value: Vec<ContractHash>) {
         self.require_permissions(PermissionsMode::Admins);
         data::set_whitelist_contracts(value)
+    }
+
+    fn set_merge_prop(&mut self, value: String) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_merge_prop(value)
+    }
+
+    fn get_merge_prop(&mut self) -> String {
+        data::get_merge_prop()
     }
 
     fn get_token_by_index(&self, owner: Key, index: U256) -> Option<TokenId> {
@@ -317,11 +328,13 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         false
     }
 
-    fn merge(&mut self, mut token_ids: Vec<TokenId>, check_prop: &str) -> Result<(), Error> {
+    fn merge(&mut self, mut token_ids: Vec<TokenId>) -> Result<(), Error> {
         if token_ids.len() < 2 {
             return Err(Error::InvalidLength);
         }
-        if check_prop.is_empty() {
+
+        let merge_prop = self.get_merge_prop().as_str();
+        if merge_prop.is_empty() {
             return Err(Error::MissingCheckingProperty);
         }
 
@@ -346,7 +359,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             .get(&last_id)
             .unwrap_or_revert_with(Error::MissingMetadata);
         let last_prop = last_metadata
-            .get(check_prop)
+            .get(merge_prop)
             .unwrap_or_revert_with(Error::MissingMetadataValue);
         if last_prop.is_empty() {
             return Err(Error::MissingMetadataValue);
@@ -361,7 +374,7 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
                 .get(other_id)
                 .unwrap_or_revert_with(Error::MissingMetadata);
             let other_prop = other_metadata
-                .get(check_prop)
+                .get(merge_prop)
                 .unwrap_or_revert_with(Error::MissingMetadataValue);
 
             if other_prop != last_prop {

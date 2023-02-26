@@ -23,6 +23,7 @@ impl CEP47Instance {
         name: &str,
         symbol: &str,
         meta: Meta,
+        merge_prop: &str
     ) -> CEP47Instance {
         let accounts = Option::<Vec<AccountHash>>::None;
         let contracts = Option::<Vec<ContractHash>>::None;
@@ -36,6 +37,7 @@ impl CEP47Instance {
                 "name" => name,
                 "symbol" => symbol,
                 "meta" => meta,
+                "merge_prop" => merge_prop,
                 "whitelist_accounts" => accounts,
                 "whitelist_contracts" => contracts
             },
@@ -53,6 +55,7 @@ impl CEP47Instance {
                 "name" => name,
                 "symbol" => symbol,
                 "meta" => meta,
+                "merge_prop" => "",
                 "whitelist_accounts" => accounts,
                 "whitelist_contracts" => contracts
             },
@@ -126,24 +129,22 @@ impl CEP47Instance {
         )
     }
 
-    pub fn merge(&self, sender: AccountHash, token_ids: Vec<TokenId>, check_prop: &str) {
+    pub fn merge(&self, sender: AccountHash, token_ids: Vec<TokenId>) {
         self.0.call_contract(
             sender,
             "merge",
             runtime_args! {
-                "token_ids" => token_ids,
-                "check_prop" => check_prop
+                "token_ids" => token_ids
             },
         )
     }
 
-    pub fn merge_fail(&self, sender: AccountHash, token_ids: Vec<TokenId>, check_prop: &str) {
+    pub fn merge_fail(&self, sender: AccountHash, token_ids: Vec<TokenId>) {
         self.0.call_contract_fail(
             sender,
             "merge",
             runtime_args! {
-                "token_ids" => token_ids,
-                "check_prop" => check_prop
+                "token_ids" => token_ids
             },
         )
     }

@@ -44,6 +44,7 @@ impl NFTToken {
         meta: Meta,
         whitelist_accounts: Vec<AccountHash>,
         whitelist_contracts: Vec<ContractHash>,
+        merge_prop: String
     ) {
         CEP47::init(
             self,
@@ -52,6 +53,7 @@ impl NFTToken {
             meta,
             whitelist_accounts,
             whitelist_contracts,
+            merge_prop
         );
     }
 }
@@ -63,7 +65,8 @@ fn constructor() {
     let meta = runtime::get_named_arg::<Meta>("meta");
     let whitelist_accounts: Vec<AccountHash> = runtime::get_named_arg(WHITELIST_ACCOUNTS);
     let whitelist_contracts: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
-    NFTToken::default().constructor(name, symbol, meta, whitelist_accounts, whitelist_contracts);
+    let merge_prop = runtime::get_named_arg::<String>("merge_prop");
+    NFTToken::default().constructor(name, symbol, meta, whitelist_accounts, whitelist_contracts, merge_prop);
 }
 
 #[no_mangle]
@@ -100,6 +103,12 @@ fn set_whitelist_accounts() {
 fn set_whitelist_contracts() {
     let value: Vec<ContractHash> = runtime::get_named_arg(WHITELIST_CONTRACTS);
     NFTToken::default().set_whitelist_contracts(value);
+}
+
+#[no_mangle]
+fn set_merge_prop() {
+    let value = runtime::get_named_arg("merge_prop");
+    NFTToken::default().set_merge_prop(value);
 }
 
 #[no_mangle]
@@ -207,9 +216,8 @@ fn get_approved() {
 #[no_mangle]
 fn merge() {
     let token_ids = runtime::get_named_arg::<Vec<TokenId>>("token_ids");
-    let check_prop = runtime::get_named_arg::<String>("check_prop");
     NFTToken::default()
-        .merge(token_ids, &check_prop)
+        .merge(token_ids)
         .unwrap_or_revert();
 }
 
@@ -220,6 +228,7 @@ fn call() {
     let symbol: String = runtime::get_named_arg("symbol");
     let meta: Meta = runtime::get_named_arg("meta");
     let contract_name: String = runtime::get_named_arg("contract_name");
+    let merge_prop: String = runtime::get_named_arg("merge_prop");
 
     let whitelist_accounts_options: Option<Vec<AccountHash>> =
         runtime::get_named_arg(WHITELIST_ACCOUNTS);
@@ -240,6 +249,7 @@ fn call() {
         "name" => name,
         "symbol" => symbol,
         "meta" => meta,
+        "merge_prop" => merge_prop,
         "whitelist_accounts" => whitelist_accounts,
         "whitelist_contracts" => whitelist_contracts
     };
@@ -306,6 +316,7 @@ fn get_entry_points() -> EntryPoints {
                 WHITELIST_CONTRACTS,
                 CLType::List(Box::new(CLType::ByteArray(32u32))),
             ),
+            Parameter::new("merge_prop", String::cl_type())
         ],
         <()>::cl_type(),
         EntryPointAccess::Groups(vec![Group::new("constructor")]),
@@ -455,8 +466,7 @@ fn get_entry_points() -> EntryPoints {
     entry_points.add_entry_point(EntryPoint::new(
         "merge",
         vec![
-            Parameter::new("token_ids", CLType::List(Box::new(TokenId::cl_type()))),
-            Parameter::new("check_prop", String::cl_type()),
+            Parameter::new("token_ids", CLType::List(Box::new(TokenId::cl_type())))
         ],
         <()>::cl_type(),
         EntryPointAccess::Public,
@@ -478,6 +488,13 @@ fn get_entry_points() -> EntryPoints {
             WHITELIST_CONTRACTS,
             CLType::List(Box::new(CLType::ByteArray(32u32))),
         )],
+        <()>::cl_type(),
+        EntryPointAccess::Public,
+        EntryPointType::Contract,
+    ));
+    entry_points.add_entry_point(EntryPoint::new(
+        "set_merge_prop",
+        vec![Parameter::new("merge_prop", String::cl_type())],
         <()>::cl_type(),
         EntryPointAccess::Public,
         EntryPointType::Contract,
