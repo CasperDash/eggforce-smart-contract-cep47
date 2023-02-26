@@ -9,3 +9,41 @@ The equivalent NFT standard on Ethereum is [ERC-721](https://eips.ethereum.org/E
 For more information on contract implementation and sending the contract to the network, visit the [CEP-47 Basic Tutorial](/Basic-Tutorial.md), an illustrated guide on implementing, deploying, and testing a sample Casper NFT contract.
 
 Visit the [Contract Interaction and Events Tutorial](/Contract-Interaction-Tutorial.md) to get more details about emitting and monitoring contract events.
+
+# Enhanced
+
+## Permissions
+
+When install a new CEP47
+
+```
+- name
+- symbol
+- meta
+- merge_prop: Property to verify 2 tokens which are able to merge, they must have the same value (e.g Class: Rock) and the caller must be also the owner of tokens. Empty to free-merge.
+- whitelist_accounts Empty to allow all accounts, set to allow specific accounts which are able to call mint / update metadata
+- whitelist_contracts: Empty to reject all contracts, set to allow specific contracts which are able to call mint / update metadata
+```
+ 
+## Merge
+- token_ids: List ofif id of token to merge, the LAST one will be kept
+ 
+# Errors
+
+```
+PermissionDenied = 1
+WrongArguments = 2
+TokenIdAlreadyExists = 3
+TokenIdDoesntExist = 4
+InvalidKey = 69
+UnlistedContractHash = 81
+MissingAdminRights = 204
+MissingMintRights = 205
+MissingMetadataRights = 206
+InvalidLength = 207
+MissingCheckingProperty = 208
+MissingMetadata = 209
+MissingMetadataValue = 210
+DifferentMetadata = 211
+```
+ 

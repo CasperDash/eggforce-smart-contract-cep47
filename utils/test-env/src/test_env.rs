@@ -30,6 +30,22 @@ impl TestEnv {
         )
     }
 
+    pub fn run_fail(
+        &self,
+        sender: AccountHash,
+        session_code: DeploySource,
+        session_args: RuntimeArgs,
+    ) {
+        deploy(
+            &mut self.state.lock().unwrap().builder,
+            &sender,
+            &session_code,
+            session_args,
+            false,
+            None,
+        )
+    }
+
     pub fn next_user(&self) -> AccountHash {
         self.state.lock().unwrap().next_user()
     }

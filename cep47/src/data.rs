@@ -7,7 +7,10 @@ use casper_contract::{
     contract_api::{runtime::get_call_stack, storage},
     unwrap_or_revert::UnwrapOrRevert,
 };
-use casper_types::{system::CallStackElement, ContractPackageHash, Key, URef, U256};
+use casper_types::{
+    account::AccountHash, system::CallStackElement, ContractHash, ContractPackageHash, Key, URef,
+    U256,
+};
 use contract_utils::{get_key, key_and_value_to_str, key_to_str, set_key, Dict};
 
 use crate::{event::CEP47Event, Meta, TokenId};
@@ -24,6 +27,10 @@ pub const NAME: &str = "name";
 pub const META: &str = "meta";
 pub const SYMBOL: &str = "symbol";
 pub const TOTAL_SUPPLY: &str = "total_supply";
+pub const TOKEN_ID_COUNTER: &str = "token_id_counter";
+pub const MERGE_PROP: &str = "merge_prop";
+pub const WHITELIST_ACCOUNTS: &str = "whitelist_accounts";
+pub const WHITELIST_CONTRACTS: &str = "whitelist_contracts";
 
 pub struct Owners {
     dict: Dict,
@@ -226,6 +233,38 @@ pub fn total_supply() -> U256 {
 
 pub fn set_total_supply(total_supply: U256) {
     set_key(TOTAL_SUPPLY, total_supply);
+}
+
+pub fn token_id_counter() -> U256 {
+    get_key(TOKEN_ID_COUNTER).unwrap_or_default()
+}
+
+pub fn set_token_id_counter(value: U256) {
+    set_key(TOKEN_ID_COUNTER, value);
+}
+
+pub fn get_whitelist_accounts() -> Vec<AccountHash> {
+    get_key(WHITELIST_ACCOUNTS).unwrap_or_default()
+}
+
+pub fn set_whitelist_accounts(value: Vec<AccountHash>) {
+    set_key(WHITELIST_ACCOUNTS, value);
+}
+
+pub fn get_whitelist_contracts() -> Vec<ContractHash> {
+    get_key(WHITELIST_CONTRACTS).unwrap_or_default()
+}
+
+pub fn set_whitelist_contracts(value: Vec<ContractHash>) {
+    set_key(WHITELIST_CONTRACTS, value);
+}
+
+pub fn get_merge_prop() -> String {
+    get_key(MERGE_PROP).unwrap_or_default()
+}
+
+pub fn set_merge_prop(value: String) {
+    set_key(MERGE_PROP, value);
 }
 
 pub fn contract_package_hash() -> ContractPackageHash {

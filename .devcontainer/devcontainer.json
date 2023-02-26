@@ -1,0 +1,20 @@
+{
+    "name": "eggforce cep47",
+    
+    "dockerComposeFile": "docker-compose.yml",
+    "service": "app",
+	"workspaceFolder": "/workspace",
+
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "eamodio.gitlens",
+                "rust-lang.rust-analyzer",
+                "ms-vscode.cmake-tools"
+            ]
+        }
+    },
+    "postCreateCommand": "make prepare",
+    "shutdownAction": "stopCompose",
+    "remoteUser": "vscode"
+}

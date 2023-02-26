@@ -5,7 +5,8 @@ use blake2::{
     VarBlake2b,
 };
 use casper_types::{
-    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, Key, RuntimeArgs, U256,
+    account::AccountHash, bytesrepr::ToBytes, runtime_args, CLTyped, ContractHash, Key,
+    RuntimeArgs, U256,
 };
 use test_env::{TestContract, TestEnv};
 
@@ -22,7 +23,11 @@ impl CEP47Instance {
         name: &str,
         symbol: &str,
         meta: Meta,
+        merge_prop: &str,
     ) -> CEP47Instance {
+        let accounts = Option::<Vec<AccountHash>>::None;
+        let contracts = Option::<Vec<ContractHash>>::None;
+
         CEP47Instance(TestContract::new(
             env,
             "cep47-token.wasm",
@@ -31,35 +36,38 @@ impl CEP47Instance {
             runtime_args! {
                 "name" => name,
                 "symbol" => symbol,
-                "meta" => meta
+                "meta" => meta,
+                "merge_prop" => merge_prop,
+                "whitelist_accounts" => accounts,
+                "whitelist_contracts" => contracts
             },
         ))
     }
 
     pub fn constructor(&self, sender: AccountHash, name: &str, symbol: &str, meta: Meta) {
+        let accounts = Option::<Vec<AccountHash>>::None;
+        let contracts = Option::<Vec<ContractHash>>::None;
+
         self.0.call_contract(
             sender,
             "constructor",
             runtime_args! {
-            "name" => name,
-            "symbol" => symbol,
-            "meta" => meta},
+                "name" => name,
+                "symbol" => symbol,
+                "meta" => meta,
+                "merge_prop" => "",
+                "whitelist_accounts" => accounts,
+                "whitelist_contracts" => contracts
+            },
         );
     }
 
-    pub fn mint_one<T: Into<Key>>(
-        &self,
-        sender: AccountHash,
-        recipient: T,
-        token_id: TokenId,
-        token_meta: Meta,
-    ) {
+    pub fn mint_one<T: Into<Key>>(&self, sender: AccountHash, recipient: T, token_meta: Meta) {
         self.0.call_contract(
             sender,
             "mint",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => vec![token_id],
                 "token_metas" => vec![token_meta]
             },
         )
@@ -69,7 +77,6 @@ impl CEP47Instance {
         &self,
         sender: AccountHash,
         recipient: T,
-        token_ids: Vec<TokenId>,
         token_meta: Meta,
         count: u32,
     ) {
@@ -78,7 +85,6 @@ impl CEP47Instance {
             "mint_copies",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => token_ids,
                 "token_meta" => token_meta,
                 "count" => count
             },
@@ -89,7 +95,6 @@ impl CEP47Instance {
         &self,
         sender: AccountHash,
         recipient: T,
-        token_ids: Vec<TokenId>,
         token_metas: Vec<Meta>,
     ) {
         self.0.call_contract(
@@ -97,7 +102,6 @@ impl CEP47Instance {
             "mint",
             runtime_args! {
                 "recipient" => recipient.into(),
-                "token_ids" => token_ids,
                 "token_metas" => token_metas
             },
         )
@@ -120,6 +124,26 @@ impl CEP47Instance {
             "burn",
             runtime_args! {
                 "owner" => owner.into(),
+                "token_ids" => token_ids
+            },
+        )
+    }
+
+    pub fn merge(&self, sender: AccountHash, token_ids: Vec<TokenId>) {
+        self.0.call_contract(
+            sender,
+            "merge",
+            runtime_args! {
+                "token_ids" => token_ids
+            },
+        )
+    }
+
+    pub fn merge_fail(&self, sender: AccountHash, token_ids: Vec<TokenId>) {
+        self.0.call_contract_fail(
+            sender,
+            "merge",
+            runtime_args! {
                 "token_ids" => token_ids
             },
         )

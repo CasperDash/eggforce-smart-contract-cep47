@@ -1,10 +1,11 @@
 use crate::{
     data::{self, Allowances, Metadata, OwnedTokens, Owners},
     event::CEP47Event,
-    Meta, TokenId,
+    utils, Meta, TokenId,
 };
 use alloc::{string::String, vec::Vec};
-use casper_types::{ApiError, Key, U256};
+use casper_contract::{contract_api::runtime, unwrap_or_revert::UnwrapOrRevert};
+use casper_types::{account::AccountHash, ApiError, ContractHash, Key, KeyTag, Tagged, U256};
 use contract_utils::{ContractContext, ContractStorage};
 use core::convert::TryInto;
 
@@ -14,6 +15,15 @@ pub enum Error {
     WrongArguments = 2,
     TokenIdAlreadyExists = 3,
     TokenIdDoesntExist = 4,
+    InvalidKey = 69,
+    UnlistedContractHash = 81,
+    MissingAdminRights = 204,
+    MissingMintRights = 205,
+    MissingMetadataRights = 206,
+    InvalidLength = 207,
+    MissingMetadata = 208,
+    MissingMetadataValue = 209,
+    DifferentMetadata = 210,
 }
 
 impl From<Error> for ApiError {
@@ -22,12 +32,34 @@ impl From<Error> for ApiError {
     }
 }
 
+#[repr(u8)]
+pub enum PermissionsMode {
+    /// Installer
+    Admins = 0,
+    // Installer, whitelisted accounts or contracts
+    Mint = 1,
+    /// Installer, whitelisted accounts, contracts or whitelisted metadata
+    Metadata = 2,
+}
+
 pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
-    fn init(&mut self, name: String, symbol: String, meta: Meta) {
+    fn init(
+        &mut self,
+        name: String,
+        symbol: String,
+        meta: Meta,
+        whitelist_accounts: Vec<AccountHash>,
+        whitelist_contracts: Vec<ContractHash>,
+        merge_prop: String,
+    ) {
         data::set_name(name);
         data::set_symbol(symbol);
         data::set_meta(meta);
         data::set_total_supply(U256::zero());
+        data::set_token_id_counter(U256::zero());
+        data::set_whitelist_accounts(whitelist_accounts);
+        data::set_whitelist_contracts(whitelist_contracts);
+        data::set_merge_prop(merge_prop);
         Owners::init();
         OwnedTokens::init();
         Metadata::init();
@@ -50,6 +82,10 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         data::total_supply()
     }
 
+    fn token_id_counter(&self) -> U256 {
+        data::token_id_counter()
+    }
+
     fn balance_of(&self, owner: Key) -> U256 {
         OwnedTokens::instance().get_balances(&owner)
     }
@@ -67,6 +103,8 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
             return Err(Error::TokenIdDoesntExist);
         };
 
+        self.require_permissions(PermissionsMode::Metadata);
+
         let metadata_dict = Metadata::instance();
         metadata_dict.set(&token_id, meta);
 
@@ -74,44 +112,58 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         Ok(())
     }
 
+    fn get_whitelist_accounts(&self) -> Vec<AccountHash> {
+        data::get_whitelist_accounts()
+    }
+
+    fn set_whitelist_accounts(&mut self, value: Vec<AccountHash>) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_whitelist_accounts(value)
+    }
+
+    fn get_whitelist_contracts(&self) -> Vec<ContractHash> {
+        data::get_whitelist_contracts()
+    }
+
+    fn set_whitelist_contracts(&mut self, value: Vec<ContractHash>) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_whitelist_contracts(value)
+    }
+
+    fn set_merge_prop(&mut self, value: String) {
+        self.require_permissions(PermissionsMode::Admins);
+        data::set_merge_prop(value)
+    }
+
+    fn get_merge_prop(&mut self) -> String {
+        data::get_merge_prop()
+    }
+
     fn get_token_by_index(&self, owner: Key, index: U256) -> Option<TokenId> {
         OwnedTokens::instance().get_token_by_index(&owner, &index)
     }
 
-    fn validate_token_ids(&self, token_ids: Vec<TokenId>) -> bool {
-        for token_id in &token_ids {
-            if self.owner_of(*token_id).is_some() {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn mint(
-        &mut self,
-        recipient: Key,
-        token_ids: Vec<TokenId>,
-        token_metas: Vec<Meta>,
-    ) -> Result<Vec<TokenId>, Error> {
-        if token_ids.len() != token_metas.len() {
-            return Err(Error::WrongArguments);
-        };
-
-        for token_id in &token_ids {
-            if self.owner_of(*token_id).is_some() {
-                return Err(Error::TokenIdAlreadyExists);
-            }
-        }
+    fn mint(&mut self, recipient: Key, token_metas: Vec<Meta>) -> Result<Vec<TokenId>, Error> {
+        self.require_permissions(PermissionsMode::Mint);
 
         let owners_dict = Owners::instance();
         let owned_tokens_dict = OwnedTokens::instance();
         let metadata_dict = Metadata::instance();
 
-        for (token_id, token_meta) in token_ids.iter().zip(&token_metas) {
-            metadata_dict.set(token_id, token_meta.clone());
-            owners_dict.set(token_id, recipient);
-            owned_tokens_dict.set_token(&recipient, token_id);
+        let mut token_id = data::token_id_counter();
+        let mut token_ids = vec![];
+
+        for token_meta in token_metas {
+            token_ids.push(token_id);
+
+            metadata_dict.set(&token_id, token_meta.clone());
+            owners_dict.set(&token_id, recipient);
+            owned_tokens_dict.set_token(&recipient, &token_id);
+
+            token_id = token_id.checked_add(U256::one()).unwrap_or_revert();
         }
+
+        data::set_token_id_counter(token_id);
 
         let minted_tokens_count: U256 = From::<u64>::from(token_ids.len().try_into().unwrap());
         let new_total_supply = data::total_supply()
@@ -129,12 +181,11 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
     fn mint_copies(
         &mut self,
         recipient: Key,
-        token_ids: Vec<TokenId>,
         token_meta: Meta,
         count: u32,
     ) -> Result<Vec<TokenId>, Error> {
         let token_metas = vec![token_meta; count.try_into().unwrap()];
-        self.mint(recipient, token_ids, token_metas)
+        self.mint(recipient, token_metas)
     }
 
     fn burn(&mut self, owner: Key, token_ids: Vec<TokenId>) -> Result<(), Error> {
@@ -276,7 +327,112 @@ pub trait CEP47<Storage: ContractStorage>: ContractContext<Storage> {
         false
     }
 
+    fn merge(&mut self, mut token_ids: Vec<TokenId>) -> Result<(), Error> {
+        if token_ids.len() < 2 {
+            return Err(Error::InvalidLength);
+        }
+
+        let merge_prop = self.get_merge_prop();
+        let has_merge_prop = !merge_prop.is_empty();
+
+        let owner = self.get_caller();
+        let metadata_dict = Metadata::instance();
+
+        // Keep the last token in list
+        let last_id = *token_ids.last().unwrap_or_revert();
+        // Confirm owner
+        match self.owner_of(last_id) {
+            Some(owner_of_key) => {
+                if owner_of_key != owner {
+                    return Err(Error::PermissionDenied);
+                }
+            }
+            None => {
+                return Err(Error::TokenIdDoesntExist);
+            }
+        }
+
+        // Remove the last item
+        token_ids.truncate(token_ids.len() - 1);
+
+        if has_merge_prop {
+            let last_metadata = metadata_dict
+                .get(&last_id)
+                .unwrap_or_revert_with(Error::MissingMetadata);
+            let last_prop = last_metadata
+                .get(&merge_prop)
+                .unwrap_or_revert_with(Error::MissingMetadataValue);
+            if last_prop.is_empty() {
+                return Err(Error::MissingMetadataValue);
+            }
+
+            // Verify that they have the same type
+            for other_id in &token_ids {
+                let other_metadata = metadata_dict
+                    .get(other_id)
+                    .unwrap_or_revert_with(Error::MissingMetadata);
+                let other_prop = other_metadata
+                    .get(&merge_prop)
+                    .unwrap_or_revert_with(Error::MissingMetadataValue);
+
+                if other_prop != last_prop {
+                    return Err(Error::DifferentMetadata);
+                }
+            }
+        }
+
+        // Let's burn others
+        self.burn_internal(owner, token_ids)
+    }
+
     fn emit(&mut self, event: CEP47Event) {
         data::emit(&event);
+    }
+
+    fn require_permissions(&mut self, mode: PermissionsMode) {
+        let caller = utils::get_verified_caller();
+        match caller.tag() {
+            KeyTag::Hash => {
+                let calling_contract = caller
+                    .into_hash()
+                    .map(ContractHash::new)
+                    .unwrap_or_default();
+                let whitelist_contracts = self.get_whitelist_contracts();
+                // We should allow only specific contracts to mint
+                if whitelist_contracts.is_empty()
+                    || !whitelist_contracts.contains(&calling_contract)
+                {
+                    runtime::revert(Error::UnlistedContractHash)
+                }
+            }
+            KeyTag::Account => {
+                let installer = runtime::get_key("installer")
+                    .unwrap_or_revert()
+                    .into_account()
+                    .unwrap_or_revert();
+
+                let caller_account = runtime::get_caller();
+                if installer != caller_account {
+                    if let PermissionsMode::Admins = mode {
+                        runtime::revert(Error::MissingAdminRights)
+                    } else {
+                        let whitelist_accounts = self.get_whitelist_accounts();
+
+                        // If no whitelist accounts, we allow everyone to mint
+                        // Otherwise, only whitelisted accounts can perform actions
+                        let valid = whitelist_accounts.is_empty()
+                            || whitelist_accounts.contains(&caller_account);
+                        if !valid {
+                            if let PermissionsMode::Mint = mode {
+                                runtime::revert(Error::MissingMintRights);
+                            } else {
+                                runtime::revert(Error::MissingMetadataRights);
+                            }
+                        }
+                    }
+                }
+            }
+            _ => runtime::revert(Error::InvalidKey),
+        }
     }
 }
